@@ -164,7 +164,7 @@ class pd_gen:
 
         fig, (ax_orig, ax_det, ax_corr)= plt.subplots(3, 1, figsize=(6, 8))
 
-        ax_orig.plot(fftshift(xf),10*np.log10(np.abs(fftshift(yf))**2))
+        ax_orig.plot(fftshift(xf),np.abs(fftshift(yf))**2)
         ax_orig.set_title('Original spectrum')
         ax_orig.set_xlabel('Frequency (MHz)')
 
@@ -194,7 +194,7 @@ if __name__ == "__main__":
     gated_cw = nl_gated_cw + noise
     cw = nl_cw + noise
 
-    detector = pd.make_detector(10)
+    detector = pd.make_detector(5)
     pd.apply_detector(gated_cw, detector, 'Noisy signal')
     pd.apply_detector(nl_gated_cw, detector, 'Noiseless signal')
 
