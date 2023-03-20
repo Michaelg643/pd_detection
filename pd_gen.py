@@ -8,6 +8,39 @@ from scipy import signal
 from scipy.fft import fft, fftfreq, fftshift
 from pdb import set_trace as keyboard
 
+def zoom_factory(ax,base_scale = 2.):
+    def zoom_fun(event):
+        # get the current x and y limits
+        cur_xlim = ax.get_xlim()
+        #cur_ylim = ax.get_ylim()
+        cur_xrange = (cur_xlim[1] - cur_xlim[0])*.5
+        #cur_yrange = (cur_ylim[1] - cur_ylim[0])*.5
+        xdata = event.xdata # get event x location
+        #ydata = event.ydata # get event y location
+        if event.button == 'up':
+            # deal with zoom in
+            scale_factor = 1/base_scale
+        elif event.button == 'down':
+            # deal with zoom out
+            scale_factor = base_scale
+        else:
+            # deal with something that should never happen
+            scale_factor = 1
+            print(event.button)
+        # set new limits
+        ax.set_xlim([xdata - cur_xrange*scale_factor,
+                     xdata + cur_xrange*scale_factor])
+        #ax.set_ylim([ydata - cur_yrange*scale_factor,
+        #             ydata + cur_yrange*scale_factor])
+        plt.draw() # force re-draw
+
+    fig = ax.get_figure() # get the figure of interest
+    # attach the call back
+    fig.canvas.mpl_connect('scroll_event',zoom_fun)
+
+    #return the function
+    return zoom_fun
+
 class pd_gen:
     def __init__(self, fc_MHz=0, fs_MSPS=0, dc_percent=0, prf_KHz=0, subframe_length_pulses=0, nfft=32768):
         self.fc_MHz = fc_MHz
@@ -129,7 +162,7 @@ class pd_gen:
         corr = signal.correlate(np.abs(fftshift(yf))**2, detector, mode='same')
         lags = signal.correlation_lags(len(yf), len(detector), mode='same')
 
-        fig, (ax_orig, ax_det, ax_corr)= plt.subplots(3, 1, figsize=(4.8, 4.8))
+        fig, (ax_orig, ax_det, ax_corr)= plt.subplots(3, 1, figsize=(6, 8))
 
         ax_orig.plot(fftshift(xf),10*np.log10(np.abs(fftshift(yf))**2))
         ax_orig.set_title('Original spectrum')
@@ -152,10 +185,10 @@ class pd_gen:
 if __name__ == "__main__":
     fs_MSPS = 50
     nfft = 32768
-    pd = pd_gen(fc_MHz = -10, fs_MSPS = fs_MSPS, dc_percent = 18, prf_KHz = 147, subframe_length_pulses=100, nfft=nfft)
+    pd = pd_gen(fc_MHz = 2.12254, fs_MSPS = fs_MSPS, dc_percent = 18, prf_KHz = 147, subframe_length_pulses=100, nfft=nfft)
     nl_gated_cw, nl_cw = pd.generate_pd()
 
-    noise_std = 13
+    noise_std = 12
     noise = noise_std/np.sqrt(2)*(np.random.randn(nl_gated_cw.size) + 1j*np.random.randn(nl_gated_cw.size))
 
     gated_cw = nl_gated_cw + noise
@@ -168,31 +201,30 @@ if __name__ == "__main__":
     #pd.plot_psd(gated_cw)
 
     # Plot these together
-    plt.figure()
+    scale = 1.5
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(nrows=4, sharex=True, figsize=(12, 12))
+    fig.tight_layout()
+    ax1.plot(np.real(nl_gated_cw))
+    ax1.plot(np.real(nl_cw), alpha=0.2, linestyle='dashed')
+    ax1.axvline(x=nfft, color='r', linestyle='dashed')
+    ax1.set_title('Real part, noiseless')
+    f1 = zoom_factory(ax1, base_scale=scale)
 
-    plt.subplot(4,1,1)
-    plt.plot(np.real(nl_gated_cw))
-    plt.plot(np.real(nl_cw), alpha=0.2, linestyle='dashed')
-    plt.axvline(x=nfft, color='r', linestyle='dashed')
-    plt.title('Real part, noiseless')
+    ax2.plot(np.imag(nl_gated_cw))
+    ax2.plot(np.imag(nl_cw), alpha=0.2, linestyle='dashed')
+    ax2.axvline(x=nfft, color='r', linestyle='dashed')
+    ax2.set_title('Imag part, noiseless')
 
-    plt.subplot(4,1,2)
-    plt.plot(np.imag(nl_gated_cw))
-    plt.plot(np.imag(nl_cw), alpha=0.2, linestyle='dashed')
-    plt.axvline(x=nfft, color='r', linestyle='dashed')
-    plt.title('Imag part, noiseless')
+    ax3.plot(np.real(gated_cw))
+    ax3.plot(np.real(cw), alpha=0.2, linestyle='dashed')
+    ax3.axvline(x=nfft, color='r', linestyle='dashed')
+    ax3.set_title(f'Real part, noise std = {noise_std}')
 
-    plt.subplot(4,1,3)
-    plt.plot(np.real(gated_cw))
-    plt.plot(np.real(cw), alpha=0.2, linestyle='dashed')
-    plt.axvline(x=nfft, color='r', linestyle='dashed')
-    plt.title(f'Real part, noise std = {noise_std}')
+    ax4.plot(np.imag(gated_cw))
+    ax4.plot(np.imag(cw), alpha=0.2, linestyle='dashed')
+    ax4.axvline(x=nfft, color='r', linestyle='dashed')
+    ax4.set_title(f'Imag part, noise std = {noise_std}')
 
-    plt.subplot(4,1,4)
-    plt.plot(np.imag(gated_cw))
-    plt.plot(np.imag(cw), alpha=0.2, linestyle='dashed')
-    plt.axvline(x=nfft, color='r', linestyle='dashed')
-    plt.title(f'Imag part, noise std = {noise_std}')
-
-    plt.suptitle('PD signal')
+    fig.canvas.manager.toolbar.pan()
     plt.show()
+
